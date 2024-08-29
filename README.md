@@ -20,4 +20,24 @@ pip3 install -r requirements.txt
 python3 geogramint.py set-config <api_id> <api_hash> <phone number>
 python3 geogramint.py start-scan <долгота широта>
 ```
+#### Запуск Docker 
+добавьте свой Telegram API в файл config.ini
+сборка образа
+```bash
+docker-compose build
+```
+запуск контейнера
+```bash
+LATITUDE=53.652634939395455 LONGITUDE=23.81233359699427 docker-compose run app
+```
+проверка состояния контейнера и образов
+```bash
+docker ps -a
+```
+остановка и удаление контейнера
+```bash
+docker-compose down
+```
+при изменении долготы и широты: изменить Dockerfile, docker-compose.yml и команду запуска.
+
 
