@@ -28,7 +28,7 @@ docker-compose build
 ```
 запуск контейнера
 ```bash
-LATITUDE=53.652634939395455 LONGITUDE=23.81233359699427 docker-compose run app
+LATITUDE=53.65432550115959 LONGITUDE=23.843930454664964 docker-compose run app
 ```
 проверка состояния контейнера и образов
 ```bash
