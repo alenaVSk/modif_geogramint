@@ -4,7 +4,6 @@ import folium
 import codecs
 import json
 
-from kivy import Logger
 from utils import User
 from utils import Group
 from io import BytesIO
@@ -216,58 +215,6 @@ def generate_ListOfGroups(groupList, peersList):
             elm.name = None
 
     return output
-
-
-'''
-A function that download all profiles pictures
-of detected users and channels (cache/users/ and cache/groups/)
-
-:param client: update
-    client obtained by logging to Telegram's API
-:param ListofUser: list
-    List of User Objects
-:param ListofGroup: list
-    List of Group Objects
-'''
-
-
-def download_allprofilespics(client, ListofUser, ListofGroup):
-    # create cache file for users profiles pictures
-    try:
-        os.mkdir("cache_telegram/users")
-    except OSError as error:
-        Logger.warning("Geogramint Files: cache_telegram/users already exist")
-
-    # create cache file for groups profiles pictures
-    try:
-        os.mkdir("cache_telegram/groups")
-    except OSError as error:
-        Logger.warning("Geogramint Files: cache_telegram/groups already exist")
-
-    # verification of the contents of User and Group objects
-    invalid_objects = True
-    while invalid_objects:
-        invalid_objects = False
-        if len(ListofUser) > 0 and not ListofUser[0].id.isnumeric():
-            ListofUser.pop(0)
-            invalid_objects = True
-        if len(ListofGroup) > 0 and not ListofGroup[0].id.isnumeric():
-            ListofGroup.pop(0)
-            invalid_objects = True
-    if len(ListofUser) == 0 and len(ListofGroup) == 0:
-        raise Exception
-
-    # download of users profile pics
-    for elm in ListofUser:
-        if not elm.id.isnumeric():
-            continue
-        client.download_profile_photo(int(elm.id), "cache_telegram/users/" + elm.id)
-
-    # download of groups profile pics
-    for elm in ListofGroup:
-        if not elm.id.isnumeric():
-            continue
-        client.download_profile_photo(int(elm.id), "cache_telegram/groups/" + elm.id)
 
 
 def generate_pdf_report(userlist, grouplist, lat, lon, timestamp, path, extended_report):

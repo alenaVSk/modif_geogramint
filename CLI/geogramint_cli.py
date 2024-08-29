@@ -3,11 +3,7 @@ __version__ = "v1.3"
 import codecs
 import os
 import shutil
-import typer
-import pandas as pd
 
-from rich.console import Console
-from rich.table import Table
 from CLI import settings_cli, ressources_cli
 from CLI.TelegramAPIRequests_CLI import geolocate_AllEntities_Nearby
 from CLI import surveillance_cli
@@ -16,6 +12,13 @@ import time
 import difflib
 from datetime import datetime, timedelta
 import random
+
+import psycopg2
+from psycopg2 import sql
+import typer
+from datetime import datetime
+from rich.console import Console
+from rich.table import Table
 
 logo_ascii = """
 \033[38;5;172;49m___________________________________________________\033[1;0m\n
@@ -40,6 +43,7 @@ logo_ascii = """
 \033[1;0m|                 \033[38;5;172;49m███████████████\033[1;0m                 |
 \033[38;5;172;49m___________________________________________________\033[1;0m\n
 """
+
 
 CLI = typer.Typer(rich_markup_mode="rich", help=logo_ascii)
 console = Console()
@@ -99,84 +103,93 @@ def set_config(id: int, hash: str, phone: str, extended_report: bool = typer.Opt
 
 
 @CLI.command(rich_help_panel='Actions Commands')
-def start_scan(lat: float, lon: float, output_json: str = typer.Option("cache_telegram", help="Directory Path"),
-               output_csv: str = typer.Option("", help="Directory Path"),
-               output_pdf: str = typer.Option("", help="Directory Path"),
-               output_osintracker: str = typer.Option("", help="Directory Path"),
+def start_scan(lat: float, lon: float,
                profile_pictures: bool = typer.Option(True, help="enable or disable profile pictures download")):
+
+
     print(logo_ascii)
     api_id, api_hash, phone_number, extended_report = settings_cli.loadConfig()
     typer.echo(typer.style("Config Loaded !", fg=typer.colors.GREEN, bold=True))
 
     users, groups, dt_string = geolocate_AllEntities_Nearby(api_id, api_hash, lat, lon, profile_pictures)
 
-    if output_json[-1] == '/':
-        output_json = output_json[:-1]
-    json_string_user = json.dumps([ob.__dict__() for ob in users], ensure_ascii=False)
-    with codecs.open(output_json + '/users.json', 'w', 'utf-8') as f:
-        f.write(json_string_user)
-    json_string_group = json.dumps([ob.__dict__() for ob in groups], ensure_ascii=False)
-    with codecs.open(output_json + '/groups.json', 'w', 'utf-8') as f:
-        f.write(json_string_group)
-    if output_csv != "":
-        if output_csv[-1] == '/':
-            output_csv = output_csv[:-1]
-        df = pd.read_json(output_json + '/users.json')
-        df.to_csv(output_csv + '/users.csv', index=None)
-        df = pd.read_json(output_json + '/groups.json')
-        df.to_csv(output_csv + '/groups.csv', index=None)
+    # Limit to 5 records
+    #users = users[:5]
+    #groups = groups[:3]
+
+    # Подключение к базе данных PostgreSQL
+    try:
+        connection = psycopg2.connect(
+            dbname="table_db",
+            user="postgres",
+            password="elena",
+            host="localhost"
+        )
+        cursor = connection.cursor()
+
+        # Текущая метка времени
+        scan_time = datetime.now()
+
+        # Вставка users в базу данных
+        for user in users:
+            cursor.execute(
+                sql.SQL("""
+                    INSERT INTO users (user_id, first_name, last_name, username, phone, distance, scan_time, latitude, longitude)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """),
+                (user.id, user.firstname, user.lastname, user.username, user.phone, int(user.distance), scan_time, lat, lon)
+            )
+
+        #  Вставка groups в базу данных
+        for group in groups:
+            cursor.execute(
+                sql.SQL("""
+                    INSERT INTO groups (group_id, name, distance, scan_time, latitude, longitude)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """),
+                (group.id, group.name, int(group.distance), scan_time, lat, lon)
+            )
+
+        connection.commit()
+        typer.echo(typer.style("Data saved to database!", fg=typer.colors.GREEN, bold=True))
+
+    except Exception as e:
+        typer.echo(typer.style(f"An error occurred: {e}", fg=typer.colors.RED, bold=True))
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
 
     console.print("[orange1]Users detected :")
     table = Table("ID", "First Name", "Last Name", "Username", "Phone", "Distance")
     for elm in users:
-        if elm.distance == '500':
-            color = '[bright_green]'
-        elif elm.distance == '1000':
-            color = '[khaki1]'
-        elif elm.distance == '2000':
-            color = '[orange1]'
-        else:
-            color = '[indian_red]'
-
-        if elm.lastname is not None:
-            lastname = color + elm.lastname[1:-1]
-        else:
-            lastname = ""
-        if elm.username is not None:
-            username = color + elm.username[1:-1]
-        else:
-            username = ""
-        if elm.phone is not None:
-            phone = color + '+' + elm.phone[1:-1]
-        else:
-            phone = ""
-        table.add_row(color + elm.id, color + elm.firstname[1:-1], lastname, username,
-                      phone, color + elm.distance)
+        color = get_color_based_on_distance(elm.distance)
+        table.add_row(color + elm.id, color + elm.firstname[1:-1], color + (elm.lastname[1:-1] if elm.lastname else ""),
+                      color + (elm.username[1:-1] if elm.username else ""), color + ('+' + elm.phone[1:-1] if elm.phone else ""),
+                      color + elm.distance)
     console.print(table)
+
     console.print("[grey93]Groups detected :")
     table_g = Table("ID", "Name", "Distance")
     for elm in groups:
-        if elm.distance == '500':
-            color = '[bright_green]'
-        elif elm.distance == '1000':
-            color = '[khaki1]'
-        elif elm.distance == '2000':
-            color = '[orange1]'
-        else:
-            color = '[indian_red]'
-
+        color = get_color_based_on_distance(elm.distance)
         table_g.add_row(color + elm.id, color + elm.name[1:-1], color + elm.distance)
     console.print(table_g)
 
-    if output_pdf != "":
-        if output_pdf[-1] == '/':
-            output_pdf = output_pdf[:-1]
-        ressources_cli.generate_pdf_report(users, groups, lat, lon, dt_string, output_pdf, extended_report)
 
-    if output_osintracker != "":
-        if output_osintracker[-1] == '/':
-            output_osintracker = output_osintracker[:-1]
-        ressources_cli.generate_osintracker_investigation(users, groups, lat, lon, output_osintracker, extended_report)
+
+def get_color_based_on_distance(distance):
+    if distance == '500':
+        return '[bright_green]'
+    elif distance == '1000':
+        return '[khaki1]'
+    elif distance == '2000':
+        return '[orange1]'
+    else:
+        return '[indian_red]'
+
 
 
 @CLI.command(rich_help_panel='Actions Commands')
@@ -244,3 +257,4 @@ def surveillance(lat: float, lon: float, num_days: int = typer.Argument(help="Da
 
     shutil.rmtree("cache_telegram", ignore_errors=True)
     shutil.rmtree("cache", ignore_errors=True)
+
