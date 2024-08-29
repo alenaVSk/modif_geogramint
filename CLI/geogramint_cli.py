@@ -114,8 +114,8 @@ def start_scan(lat: float, lon: float,
     users, groups, dt_string = geolocate_AllEntities_Nearby(api_id, api_hash, lat, lon, profile_pictures)
 
     # Limit to 5 records
-    #users = users[:5]
-    #groups = groups[:3]
+    users = users[:5]
+    groups = groups[:3]
 
     # Подключение к базе данных PostgreSQL
     try:

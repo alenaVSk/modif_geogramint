@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: my_app
+    depends_on:
+      - db
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+
+  db:
+    image: postgres:13
+    container_name: my_postgres_db
+    environment:
+      - POSTGRES_DB=table_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=elena
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./dump_db.sql:/docker-entrypoint-initdb.d/dump_db.sql
+    ports:
+      - "5433:5432"
+
+volumes:
+  postgres_data:
