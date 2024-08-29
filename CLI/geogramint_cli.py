@@ -118,12 +118,15 @@ def start_scan(lat: float, lon: float,
     groups = groups[:3]
 
     # Подключение к базе данных PostgreSQL
+    connection = None
+    cursor = None
     try:
         connection = psycopg2.connect(
-            dbname="table_db",
+            host="db",
+            port=5432,
+            database="table_db",
             user="postgres",
-            password="elena",
-            host="localhost"
+            password="elena"
         )
         cursor = connection.cursor()
 
@@ -137,10 +140,11 @@ def start_scan(lat: float, lon: float,
                     INSERT INTO users (user_id, first_name, last_name, username, phone, distance, scan_time, latitude, longitude)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """),
-                (user.id, user.firstname, user.lastname, user.username, user.phone, int(user.distance), scan_time, lat, lon)
+                (user.id, user.firstname, user.lastname, user.username, user.phone, int(user.distance), scan_time, lat,
+                 lon)
             )
 
-        #  Вставка groups в базу данных
+        # Вставка groups в базу данных
         for group in groups:
             cursor.execute(
                 sql.SQL("""
@@ -157,26 +161,10 @@ def start_scan(lat: float, lon: float,
         typer.echo(typer.style(f"An error occurred: {e}", fg=typer.colors.RED, bold=True))
 
     finally:
-        if connection:
+        if cursor:
             cursor.close()
+        if connection:
             connection.close()
-
-
-    console.print("[orange1]Users detected :")
-    table = Table("ID", "First Name", "Last Name", "Username", "Phone", "Distance")
-    for elm in users:
-        color = get_color_based_on_distance(elm.distance)
-        table.add_row(color + elm.id, color + elm.firstname[1:-1], color + (elm.lastname[1:-1] if elm.lastname else ""),
-                      color + (elm.username[1:-1] if elm.username else ""), color + ('+' + elm.phone[1:-1] if elm.phone else ""),
-                      color + elm.distance)
-    console.print(table)
-
-    console.print("[grey93]Groups detected :")
-    table_g = Table("ID", "Name", "Distance")
-    for elm in groups:
-        color = get_color_based_on_distance(elm.distance)
-        table_g.add_row(color + elm.id, color + elm.name[1:-1], color + elm.distance)
-    console.print(table_g)
 
 
 

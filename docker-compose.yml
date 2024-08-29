@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app:
     build: .
@@ -8,8 +6,12 @@ services:
       - db
     environment:
       - PYTHONUNBUFFERED=1
+      - LATITUDE=53.65432550115959
+      - LONGITUDE=23.843930454664964
     volumes:
       - .:/app
+    command: >
+      sh -c "python geogramint.py start-scan $LATITUDE $LONGITUDE"
 
   db:
     image: postgres:13
